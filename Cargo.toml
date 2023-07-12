@@ -1,0 +1,17 @@
+[package]
+name = "monoOS"
+version = "0.1.0"
+edition = "2021"
+description = "A hobbyist monolithic operating system, targeting x86-64."
+readme = "README.md"
+license = "MIT"
+authors = ["binds <bindsdev@gmail.com>"]
+
+[dependencies]
+limine = "0.1.11"
+spin = { version = "0.9.8", default-features = false, features = ["spin_mutex", "once"] }
+x86 = "0.52.0"
+
+[[bin]]
+name = "monoos"
+path = "src/main.rs"
