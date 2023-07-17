@@ -1,4 +1,5 @@
 /* output an x86-64 ELF file */
+OUTPUT_ARCH(i386:x86-64)
 OUTPUT_FORMAT(elf64-x86-64)
 
 /* make kmain symbol the entry point */
