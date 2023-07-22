@@ -9,8 +9,8 @@ authors = ["binds <bindsdev@gmail.com>"]
 
 [dependencies]
 limine = "0.1.11"
-spin = { version = "0.9.8", default-features = false, features = ["spin_mutex", "once"] }
-x86 = "0.52.0"
+spin = { version = "0.9.8", default-features = false, features = ["spin_mutex", "once", "lazy"] }
+x86_64 = "0.14.10"
 
 [[bin]]
 name = "monoos"
