@@ -95,6 +95,23 @@ impl Writer {
         let loc = x + (self.info.pitch / 4) * y;
         self.fb[loc] = color;
     }
+
+    /// Plot a character
+    pub fn plot_char(&mut self, x: usize, y: usize, ch: char) {
+        let ch = Character {
+            ch,
+            color: ColorCode(0x12345, 0x6789a),
+        };
+
+        let mask: [i32; 8] = [1, 2, 4, 8, 16, 32, 64, 128];
+        let glyph = &FONT[ch.ch as usize];
+
+        for yy in 0..8 {
+            for xx in 0..8 {
+                self.plot_pixel(xx + x, yy + y - 12, ch.color.fg() | ch.color.bg())
+            }
+        }
+    }
 }
 
 impl Write for Writer {
