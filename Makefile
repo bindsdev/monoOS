@@ -4,7 +4,7 @@ PROFILE  ?= release
 
 # Command arguments
 override CARGO_ARGS = --bin monoos --no-default-features
-override QEMU_ARGS  = -no-reboot -no-shutdown -M q35 -m 2G -drive file=$(ISO),format=raw -bios $(BUILD_ROOT)/RELEASEX64_OVMF.fd
+override QEMU_ARGS  = -no-reboot -no-shutdown -M q35 -serial stdio -m 2G -cdrom $(ISO) -bios $(BUILD_ROOT)/RELEASEX64_OVMF.fd -boot d
 
 # Checks
 ifneq ($(PROFILE),$(filter $(PROFILE),debug release))

@@ -31,12 +31,12 @@ static GDT: Lazy<(GlobalDescriptorTable, SegmentSelectors)> = Lazy::new(|| {
     )
 });
 
-/// Initialize the GDT
+/// Initialize the GDT.
 pub fn init() {
     interrupts::without_interrupts(|| {
         GDT.0.load();
 
-        // Reload segment registers
+        // Reload segment registers.
         unsafe {
             CS::set_reg(GDT.1.kcode);
             SS::set_reg(GDT.1.kdata);

@@ -60,7 +60,7 @@ pub fn hlt() -> ! {
     }
 }
 
-/// Initialize the IDT and interrupt related facilities
+/// Initialize the IDT and interrupt related facilities.
 pub fn init() {
     IDT.load();
     interrupts::enable();

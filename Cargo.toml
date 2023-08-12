@@ -8,9 +8,10 @@ license = "MIT"
 authors = ["binds <bindsdev@gmail.com>"]
 
 [dependencies]
-flanterm-rs = { version = "0.1.0", path = "../flanterm-rs" }
 limine = "0.1.11"
+log = "0.4.19"
 spin = { version = "0.9.8", default-features = false, features = ["spin_mutex", "once", "lazy"] }
+uart_16550 = "0.3.0"
 x86_64 = "0.14.10"
 
 [[bin]]
