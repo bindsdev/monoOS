@@ -9,7 +9,7 @@ authors = ["binds <bindsdev@gmail.com>"]
 
 [dependencies]
 limine = "0.1.11"
-log = "0.4.19"
+log = "0.4.20"
 spin = { version = "0.9.8", default-features = false, features = ["spin_mutex", "once", "lazy"] }
 uart_16550 = "0.3.0"
 x86_64 = "0.14.10"
