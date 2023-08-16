@@ -12,8 +12,12 @@ impl Log for SystemLogger {
 
     fn log(&self, record: &Record<'_>) {
         if self.enabled(record.metadata()) {
-            let file = record.file().unwrap();
-            let line = record.line();
+            let file = record
+                .file()
+                .map(|s| s.strip_prefix("src/"))
+                .flatten()
+                .unwrap();
+            let line = record.line().unwrap();
 
             macro log_inner($($arg:tt)*) {
                 {
@@ -27,13 +31,13 @@ impl Log for SystemLogger {
 
             match record.level() {
                 Debug => log_inner!("\x1b[35;1m[DEBUG] "),
-                Info => log_inner!("\x1b[31;1m[INFO] "),
+                Info => log_inner!("\x1b[36;1m[INFO] "),
                 Warn => log_inner!("\x1b[33;1m[WARNING] "),
                 Error => log_inner!("\x1b[32;1m[ERROR] "),
                 Trace => log_inner!("\x1b[34;1m[TRACE] "),
             }
 
-            log_inner!("\x1b[0m{}\n", record.args());
+            log_inner!("\x1b[0m({file}:{line}) {}\n", record.args());
         }
     }
 

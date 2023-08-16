@@ -1,10 +1,11 @@
 # Configuration options
 FEATURES ?=
+MEMORY   ?= 2G
 PROFILE  ?= release
 
 # Command arguments
 override CARGO_ARGS = --bin monoos --no-default-features
-override QEMU_ARGS  = -no-reboot -no-shutdown -M q35 -serial stdio -m 2G -cdrom $(ISO) -bios $(BUILD_ROOT)/RELEASEX64_OVMF.fd -boot d
+override QEMU_ARGS  = -no-reboot -no-shutdown -M q35 -serial stdio -m $(MEMORY) -cdrom $(ISO) -bios $(BUILD_ROOT)/RELEASEX64_OVMF.fd -boot d
 
 # Checks
 ifneq ($(PROFILE),$(filter $(PROFILE),debug release))
@@ -24,7 +25,8 @@ ifeq ($(PROFILE),debug)
 endif
 
 # Environment variables
-export MHOS_VERSION = v0.1.0
+export MONOOS_VERSION = v0.1.0
+export MONOOS_MEMORY = $(MEMORY)
 
 # Overrides
 override BUILD_DIR  := build

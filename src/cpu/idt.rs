@@ -1,67 +1,59 @@
-use spin::Lazy;
-use x86_64::{
-    instructions::interrupts,
-    structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
-};
+mod handlers;
 
-macro add_handlers($idt:expr, $($field:ident)+ ; $($func:ident)+) {
+use complete_pic::pic8259::ChainedPics;
+use handlers::*;
+use spin::{Lazy, Mutex};
+use x86_64::{instructions::interrupts, structures::idt::InterruptDescriptorTable};
+
+macro exception_handlers($idt:expr, $($exception:ident)+) {
     let idt = &mut $idt;
     $(
-        idt.$field.set_handler_fn($func);
+        idt.$exception.set_handler_fn($exception);
     )+
 }
 
 static IDT: Lazy<InterruptDescriptorTable> = Lazy::new(|| {
     let mut idt = InterruptDescriptorTable::new();
 
-    add_handlers! {
+    exception_handlers! {
         idt,
-        divide_error debug non_maskable_interrupt breakpoint overflow bound_range_exceeded invalid_opcode device_not_available invalid_tss segment_not_present stack_segment_fault general_protection_fault alignment_check ;
-        eDE eDB eNMI eBP eOF eBR eUD eNM eTS eNP eSS eGP eAC
+        divide_error debug non_maskable_interrupt breakpoint overflow bound_range_exceeded invalid_opcode device_not_available invalid_tss segment_not_present stack_segment_fault general_protection_fault alignment_check double_fault page_fault
     }
+
+    idt[PIC1_OFFSET as usize].set_handler_fn(timer);
 
     idt
 });
 
-macro handler {
-    // Normal handler
-    ($($ex:ident)+) => ($(
-        #[allow(non_snake_case)]
-        extern "x86-interrupt" fn $ex(_: ::x86_64::structures::idt::InterruptStackFrame) {
-            todo!();
-        }
-    )+),
-
-    // Handler with error code
-    ($($ex:ident)+, ec) => ($(
-        #[allow(non_snake_case)]
-        extern "x86-interrupt" fn $ex(_: ::x86_64::structures::idt::InterruptStackFrame, _: u64) {
-            todo!();
-        }
-    )+),
-}
-
-handler! { eDE eDB eNMI eBP eOF eBR eUD eNM }
-handler! { eTS eNP eSS eGP eAC, ec }
-
-#[allow(non_snake_case)]
-extern "x86-interrupt" fn eDF(_: InterruptStackFrame, _: u64) -> ! {
-    loop {}
-}
-
-#[allow(non_snake_case)]
-extern "x86-interrupt" fn ePF(_: InterruptStackFrame, _: PageFaultErrorCode) {
-    todo!();
-}
+const PIC1_OFFSET: u8 = 32;
+const PIC2_OFFSET: u8 = PIC1_OFFSET + 8;
+static PICS: Mutex<ChainedPics> = Mutex::new(unsafe { ChainedPics::new(PIC1_OFFSET, PIC2_OFFSET) });
 
 pub fn hlt() -> ! {
     loop {
-        unsafe { x86_64::instructions::hlt() }
+        x86_64::instructions::hlt()
     }
 }
 
 /// Initialize the IDT and interrupt related facilities.
 pub fn init() {
     IDT.load();
+    log::info!("initialized IDT");
+
+    interrupts::without_interrupts(|| {
+        let mut pics = PICS.lock();
+
+        unsafe {
+            pics.initialize();
+            pics.unmask();
+        }
+    });
+
+    log::info!(
+        "initialized 8259 PIC with master offset {m:#X} and slave offset {s:#X}",
+        m = PIC1_OFFSET,
+        s = PIC2_OFFSET
+    );
+
     interrupts::enable();
 }

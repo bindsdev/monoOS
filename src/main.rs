@@ -20,13 +20,16 @@ compile_error!("monoOS only supports the x86-64 architecture");
 mod cpu;
 mod drivers;
 mod logger;
+mod mem;
 mod tests;
 
-use core::panic::PanicInfo;
+use core::{panic::PanicInfo, sync::atomic::Ordering};
 use cpu::idt::hlt;
-use limine::FramebufferRequest;
+use limine::{FramebufferRequest, HhdmRequest, MemmapRequest};
 
 static FRAMEBUFFER: FramebufferRequest = FramebufferRequest::new(0);
+static HHDM: HhdmRequest = HhdmRequest::new(0);
+static MEMMAP: MemmapRequest = MemmapRequest::new(0);
 
 #[no_mangle]
 extern "C" fn kmain() -> ! {
@@ -35,25 +38,39 @@ extern "C" fn kmain() -> ! {
 
     // Initialize CPU state.
     cpu::init();
-    log::info!("initializing CPU state");
 
-    // Obtain the framebuffer and initialize graphics driver.
-    let framebuffer = &*FRAMEBUFFER.get_response().get().unwrap().framebuffers()[0];
-    drivers::graphics::init(framebuffer);
+    // Initialize memory allocation facilities.
+    let physical_memory_offset = HHDM
+        .get_response()
+        .get()
+        .expect("unable to obtain HHDM information")
+        .offset;
+
+    mem::PHYSICAL_MEMORY_OFFSET.store(physical_memory_offset, Ordering::Relaxed);
+
+    let memmap = MEMMAP
+        .get_response()
+        .get_mut()
+        .expect("unable to obtain memory map")
+        .memmap_mut();
+
+    mem::init(memmap);
+
+    // Obtain the framebuffer an initialize graphics driver.
+    // let framebuffer = &*FRAMEBUFFER
+    //     .get_response()
+    //     .get()
+    //     .expect("unable to obtain framebuffer")
+    //     .framebuffers()[0];
+    // drivers::graphics::init(framebuffer);
+    // log::info!("initialized graphics driver");
 
     hlt()
 }
 
 #[panic_handler]
 fn panic(info: &PanicInfo<'_>) -> ! {
-    let location = info.location().unwrap();
-
-    log::error!(
-        "panic occurred in {}:{}: {}",
-        location.file().strip_prefix("src/").unwrap(),
-        location.line(),
-        info.message().unwrap()
-    );
+    log::error!("panic occurred: {}", info.message().unwrap());
 
     hlt()
 }

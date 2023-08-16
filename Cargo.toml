@@ -8,6 +8,7 @@ license = "MIT"
 authors = ["binds <bindsdev@gmail.com>"]
 
 [dependencies]
+complete-pic = { version = "0.3.1", default-features = false, features = ["8259pic"] }
 limine = "0.1.11"
 log = "0.4.19"
 spin = { version = "0.9.8", default-features = false, features = ["spin_mutex", "once", "lazy"] }

@@ -42,4 +42,6 @@ pub fn init() {
             SS::set_reg(GDT.1.kdata);
         }
     });
+
+    log::info!("initialized GDT");
 }
