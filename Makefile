@@ -37,7 +37,7 @@ override ESP        := $(BUILD_ROOT)/EFI/BOOT
 override KERNEL_BIN := $(BUILD_ROOT)/monoos.elf
 
 # Targets
-.PHONY: all iso run miri clean
+.PHONY: all iso run test miri clean
 all: iso
 
 gen_build_dirs:
@@ -54,7 +54,10 @@ ovmf:
 kernel_build:
 	@cargo build $(CARGO_ARGS)
 
-$(ISO): gen_build_dirs limine ovmf kernel_build
+kernel_test:
+	@cargo test $(CARGO_ARGS)
+
+$(ISO): gen_build_dirs limine ovmf 	
 	@cp target/x86_64-unknown-none/$(PROFILE)/monoos $(KERNEL_BIN)
 	@cp limine.cfg $(LIMINE_DIR)/limine-uefi-cd.bin $(BUILD_ROOT)
 	@cp $(LIMINE_DIR)/BOOTX64.EFI $(ESP)
@@ -63,7 +66,11 @@ $(ISO): gen_build_dirs limine ovmf kernel_build
 # Convenience target for $(ISO)
 iso: $(ISO)
 
-run: iso
+run: kernel_build iso
+	@qemu-system-x86_64 $(QEMU_ARGS)	
+
+test: kernel_test iso
+	override QEMU_ARGS += -display none	
 	@qemu-system-x86_64 $(QEMU_ARGS)	
 
 miri:

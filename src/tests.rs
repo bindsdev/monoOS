@@ -1,5 +1,5 @@
 pub struct Test {
-    pub name: &'static str,
+    pub path: &'static str,
     pub func: fn(),
     pub quiet: bool,
 }
@@ -14,7 +14,7 @@ pub fn test_runner(tests: &[&Test]) {
         (test.func)();
 
         if !test.quiet {
-            log::info!("test {} ... ok", test.name);
+            log::info!("test {} ... ok", test.path);
         } else {
             suppressed += 1;
         }
@@ -22,8 +22,16 @@ pub fn test_runner(tests: &[&Test]) {
 
     log::info!("");
     log::info!(
-        "tests completed. {} successful;  {} suppressed",
+        "tests completed. {} successful; {} suppressed",
         successful,
         suppressed
     );
+}
+
+#[cfg(test)]
+mod tests {
+    #[mono_proc::test]
+    fn testtest() {
+        assert!(true);
+    }
 }
