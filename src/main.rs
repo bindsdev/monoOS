@@ -21,6 +21,8 @@ mod cpu;
 mod drivers;
 mod logger;
 mod mem;
+
+#[cfg(test)]
 mod tests;
 
 use core::{panic::PanicInfo, sync::atomic::Ordering};
@@ -64,6 +66,9 @@ extern "C" fn kmain() -> ! {
     //     .framebuffers()[0];
     // drivers::graphics::init(framebuffer);
     // log::info!("initialized graphics driver");
+
+    #[cfg(test)]
+    test_main();
 
     hlt()
 }

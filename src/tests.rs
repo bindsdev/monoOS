@@ -1,29 +1,30 @@
 pub struct Test {
-    pub name: &'static str,
+    pub path: &'static str,
     pub func: fn(),
     pub quiet: bool,
 }
 
 pub fn test_runner(tests: &[&Test]) {
-    log::info!("running {} tests", tests.len());
+    log::info!("running {} test(s)", tests.len());
 
-    let mut successful = 0;
+    let mut passed = 0;
     let mut suppressed = 0;
 
     for test in tests {
         (test.func)();
 
         if !test.quiet {
-            log::info!("test {} ... ok", test.name);
+            log::info!("test {} ... ok", test.path);
         } else {
             suppressed += 1;
         }
+
+        passed += 1;
     }
 
-    log::info!("");
     log::info!(
-        "tests completed. {} successful;  {} suppressed",
-        successful,
+        "tests completed: {} passed; {} suppressed",
+        passed,
         suppressed
     );
 }
