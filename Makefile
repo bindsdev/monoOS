@@ -53,9 +53,9 @@ ovmf:
 	
 kernel_build:
 	@cargo build $(CARGO_ARGS)
-
+	
 kernel_test:
-	@cargo test $(CARGO_ARGS)
+	@cargo rustc $(CARGO_ARGS) -- --test
 
 $(ISO): gen_build_dirs limine ovmf 	
 	@cp target/x86_64-unknown-none/$(PROFILE)/monoos $(KERNEL_BIN)
@@ -70,8 +70,7 @@ run: kernel_build iso
 	@qemu-system-x86_64 $(QEMU_ARGS)	
 
 test: kernel_test iso
-	override QEMU_ARGS += -display none	
-	@qemu-system-x86_64 $(QEMU_ARGS)	
+	@qemu-system-x86_64 $(QEMU_ARGS) -display none	
 
 miri:
 	@MIRI_NO_STD=1 cargo miri run --target x86_64-unknown-none

@@ -5,9 +5,9 @@ pub struct Test {
 }
 
 pub fn test_runner(tests: &[&Test]) {
-    log::info!("running {} tests", tests.len());
+    log::info!("running {} test(s)", tests.len());
 
-    let mut successful = 0;
+    let mut passed = 0;
     let mut suppressed = 0;
 
     for test in tests {
@@ -18,20 +18,13 @@ pub fn test_runner(tests: &[&Test]) {
         } else {
             suppressed += 1;
         }
+
+        passed += 1;
     }
 
-    log::info!("");
     log::info!(
-        "tests completed. {} successful; {} suppressed",
-        successful,
+        "tests completed: {} passed; {} suppressed",
+        passed,
         suppressed
     );
-}
-
-#[cfg(test)]
-mod tests {
-    #[mono_proc::test]
-    fn testtest() {
-        assert!(true);
-    }
 }
