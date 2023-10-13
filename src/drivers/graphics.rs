@@ -164,9 +164,9 @@ pub fn is_initialized() -> bool {
 pub fn init(fb: &Framebuffer) {
     let fb_info = FramebufferInfo::new(fb.width, fb.height, fb.pitch, fb.bpp);
 
-    // SAFETY: `as_ptr` will never return `None`
+    // SAFETY: `as_ptr` will never return `None`.
     let fb_addr = unsafe { fb.address.as_ptr().unwrap_unchecked() };
-    // SAFETY: `fb_addr` is non-null and aligned
+    // SAFETY: `fb_addr` upholds the safety contract for `core::slice::from_raw_parts_mut`.
     let fb_slice = unsafe { core::slice::from_raw_parts_mut(fb_addr.cast::<u32>(), fb.size()) };
 
     let writer = Writer::new(fb_slice, fb_info);

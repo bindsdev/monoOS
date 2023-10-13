@@ -1,4 +1,5 @@
 mod paging;
+mod pmm;
 
 use core::sync::atomic::AtomicU64;
 use limine::{MemmapEntry, NonNullPtr};

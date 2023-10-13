@@ -6,7 +6,8 @@
     decl_macro,
     abi_x86_interrupt,
     custom_test_frameworks,
-    panic_info_message
+    panic_info_message,
+    int_roundings
 )]
 #![test_runner(crate::tests::test_runner)]
 #![reexport_test_harness_main = "test_main"]
@@ -27,7 +28,7 @@ mod tests;
 
 use core::{panic::PanicInfo, sync::atomic::Ordering};
 use cpu::idt::hlt;
-use limine::{FramebufferRequest, HhdmRequest, MemmapRequest};
+use limine::{FramebufferRequest, HhdmRequest, KernelAddressRequest, MemmapRequest};
 
 static FRAMEBUFFER: FramebufferRequest = FramebufferRequest::new(0);
 static HHDM: HhdmRequest = HhdmRequest::new(0);

@@ -1,9 +1,6 @@
-mod pmm;
-
-use super::PHYSICAL_MEMORY_OFFSET;
+use super::{pmm::*, PHYSICAL_MEMORY_OFFSET};
 use core::sync::atomic::Ordering;
 use limine::{MemmapEntry, NonNullPtr};
-use pmm::*;
 use x86_64::{
     registers::control::Cr3,
     structures::paging::{mapper::MapToError, OffsetPageTable, PageTable, Size4KiB},
