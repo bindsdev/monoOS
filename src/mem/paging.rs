@@ -20,9 +20,7 @@ fn active_l4_page_table() -> &'static mut PageTable {
 }
 
 // Initialize paging.
-pub(super) fn init(
-    memmap: &'static mut [NonNullPtr<MemmapEntry>],
-) -> Result<OffsetPageTable<'static>, MapToError<Size4KiB>> {
+pub(super) fn init() -> OffsetPageTable<'static> {
     let l4_page_table = active_l4_page_table();
 
     // SAFETY: the reference to the level 4 page table is valid and the physical offset passed is correct.
@@ -33,6 +31,5 @@ pub(super) fn init(
         )
     };
 
-    FRAME_ALLOCATOR.init(memmap);
-    Ok(offset_page_table)
+    offset_page_table
 }

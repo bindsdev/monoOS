@@ -28,7 +28,7 @@ mod tests;
 
 use core::{panic::PanicInfo, sync::atomic::Ordering};
 use cpu::idt::hlt;
-use limine::{FramebufferRequest, HhdmRequest, KernelAddressRequest, MemmapRequest};
+use limine::{FramebufferRequest, HhdmRequest, MemmapRequest};
 
 static FRAMEBUFFER: FramebufferRequest = FramebufferRequest::new(0);
 static HHDM: HhdmRequest = HhdmRequest::new(0);
