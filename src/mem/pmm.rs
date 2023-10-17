@@ -1,3 +1,5 @@
+//! Physical memory manager/frame allocator implemented using a bitmap.
+
 use limine::{MemmapEntry, MemoryMapEntryType, NonNullPtr};
 use spin::{Mutex, MutexGuard, Once};
 use x86_64::{
@@ -157,10 +159,13 @@ impl FrameDeallocator<Size4KiB> for SystemFrameAllocator {
     }
 }
 
-pub(super) static FRAME_ALLOCATOR: Once<Mutex<SystemFrameAllocator>> = Once::new();
+static FRAME_ALLOCATOR: Once<Mutex<SystemFrameAllocator>> = Once::new();
 
 pub(super) fn get_frame_allocator() -> MutexGuard<'static, SystemFrameAllocator> {
-    FRAME_ALLOCATOR.get().unwrap().lock()
+    FRAME_ALLOCATOR
+        .get()
+        .expect("frame allocator not initialized")
+        .lock()
 }
 
 /// Initialize the physical memory manager.

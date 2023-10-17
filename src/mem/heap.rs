@@ -1,9 +1,6 @@
 //! Heap allocator
 
-use super::{
-    pmm::{get_frame_allocator, FRAME_ALLOCATOR},
-    ALLOCATOR,
-};
+use super::{pmm, PhysToVirt, ALLOCATOR};
 use x86_64::{
     structures::paging::{
         mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB,
@@ -25,7 +22,7 @@ pub(super) fn init(mapper: &mut impl Mapper<Size4KiB>) -> Result<(), MapToError<
         Page::range_inclusive(heap_start_page, heap_end_page)
     };
 
-    let mut frame_allocator = get_frame_allocator();
+    let mut frame_allocator = pmm::get_frame_allocator();
 
     for page in page_range {
         let frame = frame_allocator

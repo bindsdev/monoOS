@@ -1,6 +1,7 @@
+use core::panic::PanicInfo;
 use log::{
     Level::{self, *},
-    LevelFilter, Log, Metadata, Record,
+    LevelFilter, Log, Metadata, MetadataBuilder, Record, RecordBuilder,
 };
 
 struct SystemLogger;
@@ -30,11 +31,11 @@ impl Log for SystemLogger {
             }
 
             match record.level() {
-                Debug => log_inner!("\x1b[35;1m[DEBUG] "),
-                Info => log_inner!("\x1b[36;1m[INFO] "),
-                Warn => log_inner!("\x1b[33;1m[WARNING] "),
-                Error => log_inner!("\x1b[32;1m[ERROR] "),
-                Trace => log_inner!("\x1b[34;1m[TRACE] "),
+                Debug => log_inner!("\x1b[1;30m[DEBUG] "),
+                Info => log_inner!("\x1b[1;37m[INFO] "),
+                Warn => log_inner!("\x1b[1;94m[WARNING] "),
+                Error => log_inner!("\x1b[1;33m[ERROR] "),
+                Trace => log_inner!("\x1b[1;36m[TRACE] "),
             }
 
             log_inner!("\x1b[0m({file}:{line}) {}\n", record.args());
@@ -46,6 +47,24 @@ impl Log for SystemLogger {
 
 static LOGGER: SystemLogger = SystemLogger;
 
+/// Log panics.
+pub fn log_panic(info: &PanicInfo<'_>) {
+    let location = info.location().unwrap();
+    let file = location.file();
+    let line = location.line();
+    let args = info.message().unwrap();
+
+    let record = RecordBuilder::new()
+        .file(Some(file))
+        .line(Some(line))
+        .args(*args)
+        .metadata(MetadataBuilder::new().level(Level::Error).build())
+        .build();
+
+    LOGGER.log(&record);
+}
+
+/// Initialize the system logger.
 pub fn init() {
     log::set_logger(&LOGGER)
         .map(|()| log::set_max_level(LevelFilter::Trace))

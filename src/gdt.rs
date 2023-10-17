@@ -1,6 +1,5 @@
 use spin::Lazy;
 use x86_64::{
-    instructions::interrupts,
     registers::segmentation::{Segment, CS, SS},
     structures::gdt::{Descriptor, GlobalDescriptorTable, SegmentSelector},
 };
@@ -33,15 +32,12 @@ static GDT: Lazy<(GlobalDescriptorTable, SegmentSelectors)> = Lazy::new(|| {
 
 /// Initialize the GDT.
 pub fn init() {
-    interrupts::without_interrupts(|| {
-        GDT.0.load();
+    GDT.0.load();
+    log::info!("loaded GDT");
 
-        // Reload segment registers.
-        unsafe {
-            CS::set_reg(GDT.1.kcode);
-            SS::set_reg(GDT.1.kdata);
-        }
-    });
-
-    log::info!("initialized GDT");
+    // Reload segment registers.
+    unsafe {
+        CS::set_reg(GDT.1.kcode);
+        SS::set_reg(GDT.1.kdata);
+    }
 }

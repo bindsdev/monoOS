@@ -1,35 +1,29 @@
-use super::{pmm::*, PHYSICAL_MEMORY_OFFSET};
-use core::sync::atomic::Ordering;
-use limine::{MemmapEntry, NonNullPtr};
+use super::{physical_memory_offset, PhysToVirt};
 use x86_64::{
     registers::control::Cr3,
-    structures::paging::{mapper::MapToError, OffsetPageTable, PageTable, Size4KiB},
+    structures::paging::{OffsetPageTable, PageTable},
     VirtAddr,
 };
 
-fn active_l4_page_table() -> &'static mut PageTable {
+pub(super) fn active_l4_page_table() -> &'static mut PageTable {
     let (l4_page_table, _) = Cr3::read();
 
-    let virt_addr = VirtAddr::new(
-        l4_page_table.start_address().as_u64() + PHYSICAL_MEMORY_OFFSET.load(Ordering::Relaxed),
-    );
+    let vaddr = l4_page_table.start_address().to_virt();
 
-    let l4_page_table = virt_addr.as_mut_ptr();
+    let l4_page_table = vaddr.as_mut_ptr();
 
+    // SAFETY: `l4_page_table` is not null.
     unsafe { &mut *l4_page_table }
 }
 
-// Initialize paging.
-pub(super) fn init() -> OffsetPageTable<'static> {
-    let l4_page_table = active_l4_page_table();
+pub(super) fn mapper() -> OffsetPageTable<'static> {
+    let active_l4_page_table = active_l4_page_table();
 
-    // SAFETY: the reference to the level 4 page table is valid and the physical offset passed is correct.
-    let offset_page_table = unsafe {
+    // SAFETY: The reference to the active level 4 page table is correct and the correct physical memory offset is provided.
+    unsafe {
         OffsetPageTable::new(
-            l4_page_table,
-            VirtAddr::new(PHYSICAL_MEMORY_OFFSET.load(Ordering::Relaxed)),
+            active_l4_page_table,
+            VirtAddr::new(physical_memory_offset()),
         )
-    };
-
-    offset_page_table
+    }
 }

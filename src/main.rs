@@ -18,55 +18,66 @@ compile_error!("monoOS is only designed for 64-bit architectures");
 #[cfg(not(target_arch = "x86_64"))]
 compile_error!("monoOS only supports the x86-64 architecture");
 
-mod cpu;
+mod acpi;
 mod drivers;
+mod gdt;
+mod idt;
 mod logger;
 mod mem;
 
 #[cfg(test)]
 mod tests;
 
+#[allow(unused_extern_crates)]
+extern crate alloc;
+
 use core::{panic::PanicInfo, sync::atomic::Ordering};
-use cpu::idt::hlt;
+use idt::hlt;
 use limine::{FramebufferRequest, HhdmRequest, MemmapRequest};
+use x86_64::instructions::interrupts;
 
 static FRAMEBUFFER: FramebufferRequest = FramebufferRequest::new(0);
 static HHDM: HhdmRequest = HhdmRequest::new(0);
 static MEMMAP: MemmapRequest = MemmapRequest::new(0);
 
 #[no_mangle]
-extern "C" fn kmain() -> ! {
-    // Initialize the system logger.
-    logger::init();
+extern "C" fn kinit() -> ! {
+    interrupts::without_interrupts(|| {
+        drivers::uart::init();
 
-    // Initialize CPU state.
-    cpu::init();
+        logger::init();
 
-    // Initialize memory allocation facilities.
-    let physical_memory_offset = HHDM
-        .get_response()
-        .get()
-        .expect("unable to obtain HHDM information")
-        .offset;
+        gdt::init();
+        idt::init();
 
-    mem::PHYSICAL_MEMORY_OFFSET.store(physical_memory_offset, Ordering::Relaxed);
+        let physical_memory_offset = HHDM
+            .get_response()
+            .get()
+            .expect("unable to obtain HHDM information")
+            .offset;
 
-    let memmap = MEMMAP
-        .get_response()
-        .get_mut()
-        .expect("unable to obtain memory map")
-        .memmap_mut();
+        mem::PHYSICAL_MEMORY_OFFSET.store(physical_memory_offset, Ordering::Relaxed);
 
-    mem::init(memmap);
+        let memmap = MEMMAP
+            .get_response()
+            .get_mut()
+            .expect("unable to obtain memory map")
+            .memmap_mut();
 
-    // Obtain the framebuffer an initialize graphics driver.
-    // let framebuffer = &*FRAMEBUFFER
-    //     .get_response()
-    //     .get()
-    //     .expect("unable to obtain framebuffer")
-    //     .framebuffers()[0];
-    // drivers::graphics::init(framebuffer);
-    // log::info!("initialized graphics driver");
+        mem::init(memmap);
+        log::info!("initialized memory allocation facilities");
+
+        // let framebuffer = &*FRAMEBUFFER
+        //     .get_response()
+        //     .get()
+        //     .expect("invalid framebuffer response")
+        //     .framebuffers()
+        //     .first()
+        //     .expect("no framebuffer found");
+
+        // drivers::graphics::init(framebuffer);
+        // log::info!("initialized graphics driver");
+    });
 
     #[cfg(test)]
     test_main();
@@ -76,7 +87,7 @@ extern "C" fn kmain() -> ! {
 
 #[panic_handler]
 fn panic(info: &PanicInfo<'_>) -> ! {
-    log::error!("panic occurred: {}", info.message().unwrap());
+    logger::log_panic(info);
 
     hlt()
 }

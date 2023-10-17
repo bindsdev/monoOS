@@ -2,8 +2,8 @@
 OUTPUT_ARCH(i386:x86-64)
 OUTPUT_FORMAT(elf64-x86-64)
 
-/* make kmain symbol the entry point */
-ENTRY(kmain)
+/* make `kinit` symbol the entry point */
+ENTRY(kinit)
 
 /* define program headers to get desired MMU permissions */
 PHDRS
@@ -16,7 +16,7 @@ PHDRS
 
 SECTIONS
 {
-    /* We wanna be placed in the topmost 2GiB of the address space, for optimisations */
+    /* We want to be placed in the topmost 2GiB of the address space, for optimizations */
     /* and because that is what the Limine spec mandates. */
     /* Any address in this region will do, but often 0xffffffff80000000 is chosen as */
     /* that is the beginning of the region. */
@@ -31,7 +31,7 @@ SECTIONS
 
     /* The built-in `x86_64-unknown-none` target generates relocatable executables */
     /* by default, so we need to include the relocation information (.dynstr, .dynsym, */
-    /* and .rela) for the bootloader too properly load the kernel at runtime. */
+    /* and .rela) for the bootloader to properly load the kernel at runtime. */
     .dynsym : {
         *(.dynsym)
     } :rodata

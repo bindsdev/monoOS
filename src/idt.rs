@@ -38,22 +38,18 @@ pub fn hlt() -> ! {
 /// Initialize the IDT and interrupt related facilities.
 pub fn init() {
     IDT.load();
-    log::info!("initialized IDT");
+    log::info!("loaded IDT");
 
-    interrupts::without_interrupts(|| {
-        let mut pics = PICS.lock();
+    let mut pics = PICS.lock();
 
-        unsafe {
-            pics.initialize();
-            pics.unmask();
-        }
-    });
+    unsafe {
+        pics.initialize();
+        pics.unmask();
+    }
 
     log::info!(
         "initialized 8259 PIC with master offset {m:#X} and slave offset {s:#X}",
         m = PIC1_OFFSET,
         s = PIC2_OFFSET
     );
-
-    interrupts::enable();
 }
