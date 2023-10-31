@@ -9,8 +9,6 @@ use x86_64::{
 
 pub(super) struct SystemFrameAllocator {
     bitmap: &'static mut [u32],
-    mem_size_frames: u64,
-    next_free_bit: usize,
 }
 
 impl SystemFrameAllocator {
@@ -43,11 +41,7 @@ impl SystemFrameAllocator {
             core::slice::from_raw_parts_mut::<'static>(bitmap_region_base_ptr, bitmap_size as usize)
         };
 
-        let mut allocator = Self {
-            bitmap,
-            mem_size_frames,
-            next_free_bit: 0,
-        };
+        let mut allocator = Self { bitmap };
 
         allocator.clear_bitmap();
 
@@ -73,15 +67,6 @@ impl SystemFrameAllocator {
             allocator.mark_contiguous_frames(base, end, true);
         }
 
-        let chunk = allocator
-            .bitmap
-            .iter()
-            .position(|c| *c != u32::MAX)
-            .expect("pmm: no memory remaining");
-        let trailing_ones = allocator.bitmap[chunk].trailing_ones() as usize; // This OS runs on a little-endian architecture, so the most significant bits are stored last.
-        let first_free_bit = chunk * 32 + trailing_ones;
-        allocator.next_free_bit = first_free_bit;
-
         allocator
     }
 
@@ -99,16 +84,9 @@ impl SystemFrameAllocator {
 
         if allocated {
             self.bitmap[chunk] |= 1 << chunk_bit;
-            self.next_free_bit = frame + 1;
         } else {
             self.bitmap[chunk] &= !(1 << chunk_bit);
-            self.next_free_bit = frame - 1;
         }
-    }
-
-    /// Mark the next free frame as allocated.
-    fn mark_next_frame(&mut self) {
-        self.mark_frame(self.next_free_bit, true);
     }
 
     /// Mark a contiguous chunk of frames starting at physical address `base` and ending at
@@ -131,23 +109,32 @@ impl SystemFrameAllocator {
     }
 
     /// Allocate a frame.
-    fn alloc_frame(&mut self) -> Option<PhysAddr> {
-        let bit = self.next_free_bit;
-        self.mark_next_frame();
+    fn allocate(&mut self) -> Option<PhysAddr> {
+        // Find the first free bit.
+        let chunk = self
+            .bitmap
+            .iter()
+            .position(|c| *c != u32::MAX)
+            .expect("pmm: physical memory exhausted");
+        let trailing_ones = self.bitmap[chunk].trailing_ones() as usize; // This OS runs on a little-endian architecture, so the most significant bits are stored last.
+        let first_free_bit = chunk * 32 + trailing_ones;
 
-        Some(PhysAddr::new(bit as u64 * Self::FRAME_SIZE))
+        self.mark_frame(first_free_bit, true);
+
+        Some(PhysAddr::new(first_free_bit as u64 * Self::FRAME_SIZE))
     }
 
     /// Deallocate the frame starting at `frame_addr`.
-    fn dealloc_frame(&mut self, frame_addr: PhysAddr) {
+    fn deallocate(&mut self, frame_addr: PhysAddr) {
         let frame = frame_addr.as_u64() / Self::FRAME_SIZE;
         self.mark_frame(frame as usize, false);
     }
 }
 
+// SAFETY: the frame allocator returns unique, usable frames.
 unsafe impl FrameAllocator<Size4KiB> for SystemFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame<Size4KiB>> {
-        let phys = self.alloc_frame()?;
+        let phys = self.allocate()?;
         Some(PhysFrame::containing_address(phys))
     }
 }
@@ -155,12 +142,17 @@ unsafe impl FrameAllocator<Size4KiB> for SystemFrameAllocator {
 impl FrameDeallocator<Size4KiB> for SystemFrameAllocator {
     unsafe fn deallocate_frame(&mut self, frame: PhysFrame<Size4KiB>) {
         let phys = frame.start_address();
-        self.dealloc_frame(phys);
+        self.deallocate(phys);
     }
 }
 
 static FRAME_ALLOCATOR: Once<Mutex<SystemFrameAllocator>> = Once::new();
 
+/// Get a handle to the frame allocator.
+///
+/// # Panics
+///
+/// This function will panic if the frame allocator has not been initialized.
 pub(super) fn get_frame_allocator() -> MutexGuard<'static, SystemFrameAllocator> {
     FRAME_ALLOCATOR
         .get()
@@ -171,4 +163,19 @@ pub(super) fn get_frame_allocator() -> MutexGuard<'static, SystemFrameAllocator>
 /// Initialize the physical memory manager.
 pub(super) fn init(memmap: &'static mut [NonNullPtr<MemmapEntry>]) {
     FRAME_ALLOCATOR.call_once(|| Mutex::new(SystemFrameAllocator::new(memmap)));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn allocation() {
+        let mut frame_allocator = get_frame_allocator();
+
+        let frame = frame_allocator.allocate_frame().unwrap();
+        let frame_idx =
+            (frame.start_address().as_u64() / SystemFrameAllocator::FRAME_SIZE) as usize;
+        assert!(frame_allocator.is_frame_used(frame_idx));
+    }
 }

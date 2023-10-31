@@ -14,6 +14,7 @@ pub fn test(attr: TokenStream, item: TokenStream) -> TokenStream {
     let body = &input.block;
 
     let test_marker = quote::format_ident!("{name}_test_marker");
+
     let result = quote::quote! {
         #[test_case]
         static #test_marker: crate::tests::Test = crate::tests::Test {

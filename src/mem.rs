@@ -28,7 +28,7 @@ pub fn init(memmap: &'static mut [NonNullPtr<MemmapEntry>]) {
 
     let mut mapper = paging::mapper();
 
-    heap::init(&mut mapper).expect("heap: initialization failed");
+    // heap::init(&mut mapper).expect("heap: initialization failed");
 }
 
 /// Convert a physical address to a virtual address.

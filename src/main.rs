@@ -28,6 +28,9 @@ mod mem;
 #[cfg(test)]
 mod tests;
 
+#[macro_use]
+extern crate mono_proc;
+
 #[allow(unused_extern_crates)]
 extern crate alloc;
 

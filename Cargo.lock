@@ -46,6 +46,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "intrusive-collections"
+version = "0.9.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b694dc9f70c3bda874626d2aed13b780f137aab435f4e9814121955cf706122e"
+dependencies = [
+ "memoffset",
+]
+
+[[package]]
 name = "limine"
 version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -77,6 +86,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 
 [[package]]
+name = "memoffset"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a634b1c61a95585bd15607c6ab0c4e5b226e695ff2800ba0cdccddf208c406c"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "mono-proc"
 version = "0.1.0"
 dependencies = [
@@ -92,6 +110,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "complete-pic",
+ "intrusive-collections",
  "limine",
  "linked_list_allocator",
  "log",
