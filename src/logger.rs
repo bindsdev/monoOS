@@ -17,7 +17,7 @@ impl Log for SystemLogger {
                 .file()
                 .map(|s| s.strip_prefix("src/"))
                 .flatten()
-                .unwrap();
+                .unwrap_or("[external]");
             let line = record.line().unwrap();
 
             macro log_inner($($arg:tt)*) {
@@ -38,7 +38,11 @@ impl Log for SystemLogger {
                 Trace => log_inner!("\x1b[1;36m[TRACE] "),
             }
 
-            log_inner!("\x1b[0m({file}:{line}) {}\n", record.args());
+            if file == "[external]" {
+                log_inner!("\x1b[0m({file}) {}\n", record.args());
+            } else {
+                log_inner!("\x1b[0m({file}:{line}) {}\n", record.args());
+            }
         }
     }
 

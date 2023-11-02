@@ -2,7 +2,10 @@
 
 use super::{paging, pmm, PhysToVirt};
 use alloc::boxed::Box;
-use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink};
+use core::cell::Cell;
+use intrusive_collections::{
+    intrusive_adapter, linked_list::CursorMut, LinkedList, LinkedListLink,
+};
 use spin::{Mutex, MutexGuard, Once};
 use x86_64::{
     registers::control::Cr3,
@@ -13,6 +16,9 @@ use x86_64::{
     },
     VirtAddr,
 };
+
+const VMALLOC_START: usize = 0xfffff80000000000;
+const VMALLOC_SIZE: usize = 128 * 1024 * 1024;
 
 /// A virtual address space, containing the root level 4 page table.
 struct VAddressSpace {
@@ -54,13 +60,7 @@ impl VAddressSpace {
 
     /// Return the active virtual address space.
     fn active() -> Self {
-        let l4_page_table = {
-            let (active_l4_page_table, _) = Cr3::read();
-            let pt_addr = active_l4_page_table.start_address();
-
-            PhysFrame::containing_address(pt_addr)
-        };
-
+        let (l4_page_table, _) = Cr3::read();
         Self { l4_page_table }
     }
 
@@ -83,20 +83,35 @@ impl VAddressSpace {
 }
 
 /// A free region of virtual memory.
+// TODO: find way to remove need for `Cell`s
+#[derive(Debug)]
 struct FreeVMRegion {
     /// The base address of this free region of virtual memory.
-    base: VirtAddr,
+    base: Cell<VirtAddr>,
 
     /// The length, in bytes, of this free region of virtual memory.
-    len: usize,
+    len: Cell<usize>,
 
     link: LinkedListLink,
 }
 
 impl FreeVMRegion {
+    fn new(base: VirtAddr, len: usize) -> Self {
+        Self {
+            base: Cell::new(base),
+            len: Cell::new(len),
+            link: LinkedListLink::new(),
+        }
+    }
+
+    /// Set the base.
+    fn set_base(&self, new_base: VirtAddr) {
+        self.base.replace(new_base);
+    }
+
     /// Shorten the length of this free virtual memory region to the specified length.
-    fn truncate(&mut self, new_len: usize) {
-        self.len = new_len;
+    fn truncate(&self, new_len: usize) {
+        self.len.replace(new_len);
     }
 }
 
@@ -112,9 +127,17 @@ pub(super) struct VMAlloc {
 
 impl VMAlloc {
     fn new() -> Self {
+        let mut free_list = LinkedList::new(FreeVMRegionAdapter::new());
+
+        free_list.push_front(Box::new(FreeVMRegion::new(
+            VirtAddr::new(VMALLOC_START as u64),
+            VMALLOC_SIZE,
+        )));
+        log::info!("{n:#?}", n = free_list.iter().next());
+
         Self {
             address_space: VAddressSpace::active(),
-            free_list: LinkedList::new(FreeVMRegionAdapter::new()),
+            free_list,
         }
     }
 
@@ -122,45 +145,49 @@ impl VMAlloc {
     pub(super) fn allocate(&mut self, pages: usize, flags: PageTableFlags) -> Option<VirtAddr> {
         let requested_bytes = pages * Size4KiB::SIZE as usize;
 
-        let mut cur = self.free_list.front_mut();
-        let mut vaddr: Option<VirtAddr> = None;
+        let region = self
+            .free_list
+            .iter()
+            .find(|region| region.len.get() >= requested_bytes);
+        log::info!("{null}", null = region.is_none());
+        // let mut region_cursor = unsafe { self.free_list.cursor_mut_from_ptr(region as *const _) };
+        // let region = region_cursor.get().unwrap();
+        // let addr = region.base.get();
+        // let region_len = region.len.get();
 
-        while !cur.is_null() {
-            let region = cur.get().unwrap();
+        // if region_len > requested_bytes {
+        //     region.set_base(addr + requested_bytes);
+        //     region.truncate(region_len - requested_bytes);
+        // } else {
+        //     region_cursor.remove();
+        // }
 
-            // Check if the current region can fit an allocation of the requested bytes.
-            if region.len >= requested_bytes {
-                vaddr = Some(region.base);
-                break;
-            }
+        // let page_range = {
+        //     let start_page = Page::containing_address(addr);
+        //     let end_page = Page::containing_address(addr + requested_bytes);
 
-            cur.move_next();
-        }
+        //     Page::range_inclusive(start_page, end_page)
+        // };
 
-        let page_range = {
-            let start_page = Page::containing_address(vaddr?);
-            let end_page = Page::containing_address(vaddr? + requested_bytes);
+        // let mut mapper = self.address_space.mapper();
+        // let mut frame_allocator = pmm::get_frame_allocator();
 
-            Page::range_inclusive(start_page, end_page)
-        };
+        // for page in page_range {
+        //     let frame = frame_allocator
+        //         .allocate_frame()
+        //         .expect("physical memory exhaused");
 
-        let mut mapper = self.address_space.mapper();
-        let mut frame_allocator = pmm::get_frame_allocator();
+        //     unsafe {
+        //         mapper
+        //             .map_to(page, frame, flags, &mut *frame_allocator)
+        //             .ok()?
+        //             .flush();
+        //     }
+        // }
 
-        for page in page_range {
-            let frame = frame_allocator
-                .allocate_frame()
-                .expect("physical memory exhaused");
+        // Some(addr)
 
-            unsafe {
-                mapper
-                    .map_to(page, frame, flags, &mut *frame_allocator)
-                    .ok()?
-                    .flush();
-            }
-        }
-
-        vaddr
+        None
     }
 }
 

@@ -6,7 +6,7 @@ mod vmm;
 use core::sync::atomic::{AtomicU64, Ordering};
 use limine::{MemmapEntry, NonNullPtr};
 use linked_list_allocator::LockedHeap;
-use x86_64::{PhysAddr, VirtAddr};
+use x86_64::{structures::paging::PageTableFlags, PhysAddr, VirtAddr};
 
 #[global_allocator]
 static ALLOCATOR: LockedHeap = LockedHeap::empty();
@@ -26,9 +26,12 @@ pub fn init(memmap: &'static mut [NonNullPtr<MemmapEntry>]) {
     vmm::init();
     log::info!("initialized virtual memory manager");
 
-    let mut mapper = paging::mapper();
+    let addr = vmm::get_vmalloc()
+        .allocate(1, PageTableFlags::PRESENT | PageTableFlags::WRITABLE)
+        .unwrap();
+    log::info!("{addr:#?}");
 
-    // heap::init(&mut mapper).expect("heap: initialization failed");
+    heap::init().expect("heap: initialization failed");
 }
 
 /// Convert a physical address to a virtual address.
