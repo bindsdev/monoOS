@@ -14,10 +14,10 @@ const HEAP_END: usize = HEAP_START + HEAP_SIZE;
 
 /// Initialize heap.
 pub(super) fn init() -> Result<(), MapToError<Size4KiB>> {
-    vmm::get_vmalloc().allocate(
-        HEAP_START + (HEAP_END - 1),
-        PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-    );
+    // vmm::get_vmalloc().allocate(
+    //     HEAP_START + (HEAP_END - 1),
+    //     PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+    // );
 
     unsafe {
         ALLOCATOR.lock().init(HEAP_START as *mut _, HEAP_SIZE);

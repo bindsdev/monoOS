@@ -26,12 +26,10 @@ pub fn init(memmap: &'static mut [NonNullPtr<MemmapEntry>]) {
     vmm::init();
     log::info!("initialized virtual memory manager");
 
-    let addr = vmm::get_vmalloc()
-        .allocate(1, PageTableFlags::PRESENT | PageTableFlags::WRITABLE)
-        .unwrap();
-    log::info!("{addr:#?}");
+    // let addr = vmm::get_vmalloc().allocate(1, PageTableFlags::PRESENT | PageTableFlags::WRITABLE);
+    // log::info!("{addr:#?}");
 
-    heap::init().expect("heap: initialization failed");
+    // heap::init().expect("heap: initialization failed");
 }
 
 /// Convert a physical address to a virtual address.

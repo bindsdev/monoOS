@@ -1,11 +1,6 @@
 //! Virtual memory manager implemented using a free list.
 
 use super::{paging, pmm, PhysToVirt};
-use alloc::boxed::Box;
-use core::cell::Cell;
-use intrusive_collections::{
-    intrusive_adapter, linked_list::CursorMut, LinkedList, LinkedListLink,
-};
 use spin::{Mutex, MutexGuard, Once};
 use x86_64::{
     registers::control::Cr3,
@@ -83,57 +78,58 @@ impl VAddressSpace {
 }
 
 /// A free region of virtual memory.
-// TODO: find way to remove need for `Cell`s
 #[derive(Debug)]
 struct FreeVMRegion {
     /// The base address of this free region of virtual memory.
-    base: Cell<VirtAddr>,
+    base: VirtAddr,
 
     /// The length, in bytes, of this free region of virtual memory.
-    len: Cell<usize>,
+    len: usize,
 
-    link: LinkedListLink,
+    prev: *mut FreeVMRegion,
+    next: *mut FreeVMRegion,
 }
 
 impl FreeVMRegion {
-    fn new(base: VirtAddr, len: usize) -> Self {
+    fn new(base: u64, len: usize) -> Self {
         Self {
-            base: Cell::new(base),
-            len: Cell::new(len),
-            link: LinkedListLink::new(),
+            base: VirtAddr::new(base),
+            len,
+            prev: core::ptr::null_mut(),
+            next: core::ptr::null_mut(),
         }
-    }
-
-    /// Set the base.
-    fn set_base(&self, new_base: VirtAddr) {
-        self.base.replace(new_base);
-    }
-
-    /// Shorten the length of this free virtual memory region to the specified length.
-    fn truncate(&self, new_len: usize) {
-        self.len.replace(new_len);
     }
 }
 
-intrusive_adapter!(FreeVMRegionAdapter = Box<FreeVMRegion>: FreeVMRegion { link: LinkedListLink });
-
 pub(super) struct VMAlloc {
-    /// The address space managed by this VMM instance.
-    address_space: VAddressSpace,
-
-    /// Doubly-linked list used to store the free portions of the virtual address space.
-    free_list: LinkedList<FreeVMRegionAdapter>,
+    inner: Mutex<VMAllocInner>,
 }
 
 impl VMAlloc {
     fn new() -> Self {
-        let mut free_list = LinkedList::new(FreeVMRegionAdapter::new());
+        Self {
+            inner: Mutex::new(VMAllocInner::new()),
+        }
+    }
 
-        free_list.push_front(Box::new(FreeVMRegion::new(
-            VirtAddr::new(VMALLOC_START as u64),
-            VMALLOC_SIZE,
-        )));
-        log::info!("{n:#?}", n = free_list.iter().next());
+    /// Allocate a given amount of pages with the given flags.
+    pub(super) fn allocate(&mut self, pages: usize, flags: PageTableFlags) -> Option<VirtAddr> {
+        self.inner.lock().allocate(pages, flags)
+    }
+}
+
+pub(super) struct VMAllocInner {
+    /// The address space managed by this VMM instance.
+    address_space: VAddressSpace,
+
+    /// Doubly-linked list used to store the free portions of the virtual address space.
+    free_list: *mut FreeVMRegion,
+}
+
+impl VMAllocInner {
+    fn new() -> Self {
+        let mut free_list = FreeVMRegion::new(VMALLOC_START as u64, VMALLOC_SIZE);
+        let free_list = unsafe { &mut free_list as *mut _ };
 
         Self {
             address_space: VAddressSpace::active(),
@@ -141,68 +137,70 @@ impl VMAlloc {
         }
     }
 
-    /// Allocate a given amount of pages with given flags.
-    pub(super) fn allocate(&mut self, pages: usize, flags: PageTableFlags) -> Option<VirtAddr> {
+    fn allocate(&mut self, pages: usize, flags: PageTableFlags) -> Option<VirtAddr> {
         let requested_bytes = pages * Size4KiB::SIZE as usize;
 
-        let region = self
-            .free_list
-            .iter()
-            .find(|region| region.len.get() >= requested_bytes);
-        log::info!("{null}", null = region.is_none());
-        // let mut region_cursor = unsafe { self.free_list.cursor_mut_from_ptr(region as *const _) };
-        // let region = region_cursor.get().unwrap();
-        // let addr = region.base.get();
-        // let region_len = region.len.get();
+        let mut cur = self.free_list;
+        let mut sufficient_region: Option<FreeVMRegion> = None;
 
-        // if region_len > requested_bytes {
-        //     region.set_base(addr + requested_bytes);
-        //     region.truncate(region_len - requested_bytes);
-        // } else {
-        //     region_cursor.remove();
-        // }
+        while !cur.is_null() {
+            let region = unsafe { core::ptr::read(cur) };
 
-        // let page_range = {
-        //     let start_page = Page::containing_address(addr);
-        //     let end_page = Page::containing_address(addr + requested_bytes);
+            if region.len >= requested_bytes {
+                sufficient_region = Some(region);
+                break;
+            }
 
-        //     Page::range_inclusive(start_page, end_page)
-        // };
+            cur = region.next;
+        }
 
-        // let mut mapper = self.address_space.mapper();
-        // let mut frame_allocator = pmm::get_frame_allocator();
+        let sufficient_region = sufficient_region?;
+        let vaddr = sufficient_region.base;
+        let len = sufficient_region.len;
 
-        // for page in page_range {
-        //     let frame = frame_allocator
-        //         .allocate_frame()
-        //         .expect("physical memory exhaused");
+        // TODO: if `len` == `requested_bytes`, fully remove region from free list. else, resize it.
 
-        //     unsafe {
-        //         mapper
-        //             .map_to(page, frame, flags, &mut *frame_allocator)
-        //             .ok()?
-        //             .flush();
-        //     }
-        // }
+        let page_range = {
+            let start_page = Page::containing_address(vaddr);
+            let end_page = Page::containing_address(vaddr + requested_bytes);
 
-        // Some(addr)
+            Page::range_inclusive(start_page, end_page)
+        };
 
-        None
+        let mut mapper = self.address_space.mapper();
+        let mut frame_allocator = pmm::get_frame_allocator();
+
+        for page in page_range {
+            let frame = frame_allocator
+                .allocate_frame()
+                .expect("physical memory exhausted");
+
+            unsafe {
+                mapper.map_to(page, frame, flags, &mut *frame_allocator);
+            }
+        }
+
+        Some(vaddr)
     }
 }
 
-static VMALLOC: Once<Mutex<VMAlloc>> = Once::new();
+// SAFETY: `VMAllocInner` is protected by a `Mutex`.
+unsafe impl Send for VMAlloc {}
+// SAFETY: See above.
+unsafe impl Sync for VMAlloc {}
+
+static VMALLOC: Once<VMAlloc> = Once::new();
 
 /// Get a handle to the virtual memory manager.
 ///
 /// # Panics
 ///
 /// This function will panic if the virtual memory manager has not been initialized.
-pub(super) fn get_vmalloc() -> MutexGuard<'static, VMAlloc> {
-    VMALLOC.get().expect("vmalloc not initialized ").lock()
-}
+// pub(super) fn get_vmalloc() -> VMAlloc {
+//     VMALLOC.get().expect("vmalloc not initialized ")
+// }
 
 /// Initialize the virtual memory manager.
 pub(super) fn init() {
-    VMALLOC.call_once(|| Mutex::new(VMAlloc::new()));
+    VMALLOC.call_once(|| VMAlloc::new());
 }
