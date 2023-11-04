@@ -16,6 +16,7 @@ const VMALLOC_START: usize = 0xfffff80000000000;
 const VMALLOC_SIZE: usize = 128 * 1024 * 1024;
 
 /// A virtual address space, containing the root level 4 page table.
+#[derive(Debug)]
 struct VAddressSpace {
     l4_page_table: PhysFrame,
 }
@@ -24,7 +25,7 @@ impl VAddressSpace {
     /// Allocate a new virtual address space.
     fn new() -> Result<Self, MapToError<Size4KiB>> {
         let l4_page_table = {
-            let frame = pmm::get_frame_allocator()
+            let frame = pmm::get_pmm()
                 .allocate_frame()
                 .ok_or(MapToError::FrameAllocationFailed)?;
 
@@ -101,6 +102,7 @@ impl FreeVMRegion {
     }
 }
 
+#[derive(Debug)]
 pub(super) struct VMAlloc {
     inner: Mutex<VMAllocInner>,
 }
@@ -118,6 +120,7 @@ impl VMAlloc {
     }
 }
 
+#[derive(Debug)]
 pub(super) struct VMAllocInner {
     /// The address space managed by this VMM instance.
     address_space: VAddressSpace,
@@ -168,15 +171,13 @@ impl VMAllocInner {
         };
 
         let mut mapper = self.address_space.mapper();
-        let mut frame_allocator = pmm::get_frame_allocator();
+        let mut pmm = pmm::get_pmm();
 
         for page in page_range {
-            let frame = frame_allocator
-                .allocate_frame()
-                .expect("physical memory exhausted");
+            let frame = pmm.allocate_frame().expect("physical memory exhausted");
 
             unsafe {
-                mapper.map_to(page, frame, flags, &mut *frame_allocator);
+                mapper.map_to(page, frame, flags, &mut *pmm);
             }
         }
 

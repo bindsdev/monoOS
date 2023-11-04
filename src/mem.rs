@@ -1,3 +1,4 @@
+mod bootstrap;
 mod heap;
 mod paging;
 mod pmm;

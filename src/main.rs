@@ -7,7 +7,8 @@
     abi_x86_interrupt,
     custom_test_frameworks,
     panic_info_message,
-    int_roundings
+    int_roundings,
+    allocator_api
 )]
 #![test_runner(crate::tests::test_runner)]
 #![reexport_test_harness_main = "test_main"]
